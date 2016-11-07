@@ -3,7 +3,7 @@
 
 #pragma pack(1)
 struct IAT_STRUCT {
-	SHORT opcode;
+	BYTE opcode;
 	LPVOID lpTarget;
 };
 #pragma pack()
@@ -28,7 +28,7 @@ typedef NTSTATUS tNtReadFile(
 	_In_opt_ PULONG           Key
 );
 
-LPVOID newFunc;
+void * newFunc;
 tNtReadFile *oldFunc;
 
 NTSTATUS NewNtReadFile(
@@ -52,22 +52,22 @@ VOID testFunction() {
 void tryHook() 
 {
 	DWORD dwOldProtect;
-	LPVOID lpOriginal = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtReadFile");
+	void * lpOriginal = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtReadFile");
 
 	IAT_STRUCT *lpSavedFunc = (IAT_STRUCT *)VirtualAlloc(nullptr, sizeof(IAT_STRUCT), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 	IAT_STRUCT newIATSTRUCT;
 
-	memcpy_s(lpSavedFunc, 6, lpOriginal, 6);
+	memcpy_s(lpSavedFunc, 5, lpOriginal, 5);
 
 	newFunc = &testFunction;
 	oldFunc = (tNtReadFile*)lpSavedFunc->lpTarget;
 
-	newIATSTRUCT.opcode = 0x25FF;
-	newIATSTRUCT.lpTarget = &newFunc;
+	newIATSTRUCT.opcode = 0xE9;
+	newIATSTRUCT.lpTarget = reinterpret_cast<void *>((reinterpret_cast<int>(newFunc) - reinterpret_cast<int>(lpOriginal)) - 5);
 
-	VirtualProtect(lpOriginal, 6, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-	memcpy_s(lpOriginal , 6, &newIATSTRUCT, 6);
-	VirtualProtect(lpOriginal, 6, dwOldProtect, NULL);
+	VirtualProtect(lpOriginal, 5, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+	memcpy_s(lpOriginal , 5, &newIATSTRUCT, 5);
+	VirtualProtect(lpOriginal, 5, dwOldProtect, NULL);
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
