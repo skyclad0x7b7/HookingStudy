@@ -1,13 +1,6 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include <Windows.h>
 
-#pragma pack(1)
-struct IAT_STRUCT {
-	BYTE opcode;
-	LPVOID lpTarget;
-};
-#pragma pack()
-
 typedef struct _IO_STATUS_BLOCK {
 	union {
 		NTSTATUS Status;
@@ -28,8 +21,16 @@ typedef NTSTATUS tNtReadFile(
 	_In_opt_ PULONG           Key
 );
 
+typedef tNtReadFile * PFNTREADFILE;
+
 void * newFunc;
 tNtReadFile *oldFunc;
+BYTE org_bytes[5];
+
+BOOL hook(LPCSTR szDllName, LPCSTR szFuncName, PROC pfnNew, PBYTE pOrgBytes);
+BOOL unHook(LPCSTR szDllName, LPCSTR szFuncName, PBYTE pOrgBytes);
+
+/************************************************************************/
 
 NTSTATUS NewNtReadFile(
 	_In_     HANDLE           FileHandle,
@@ -42,32 +43,53 @@ NTSTATUS NewNtReadFile(
 	_In_opt_ PLARGE_INTEGER   ByteOffset,
 	_In_opt_ PULONG           Key
 ) {
-	return oldFunc(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
+	unHook("ntdll.dll", "NtReadFile", org_bytes);
+	PROC pFunc;
+	NTSTATUS ret;
+	pFunc = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtReadFile");
+	ret = ((PFNTREADFILE)pFunc)(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
+	MessageBox(NULL, NULL, NULL, NULL);
+	hook("ntdll.dll", "NtReadFile", (PROC)NewNtReadFile, org_bytes);
+	return ret;
 }
 
-VOID testFunction() {
-	MessageBox(NULL, NULL, NULL, NULL);
+BOOL hook(LPCSTR szDllName, LPCSTR szFuncName, PROC pfnNew, PBYTE pOrgBytes) {
+	DWORD dwOldProtect, dwAddress;
+	PROC lpOriginal = GetProcAddress(GetModuleHandleA(szDllName), szFuncName);
+	PBYTE pByte = (PBYTE)lpOriginal;
+	if (pByte[0] == 0xE9) // already hooked
+		return FALSE;
+
+	BYTE pBuf[5] = { 0xE9, 0, };
+
+	// backup old codes
+	memcpy_s(pOrgBytes, 5, lpOriginal, 5);
+
+	// calculate address of new function
+	dwAddress = (DWORD)pfnNew - (DWORD)lpOriginal - 5;
+	memcpy_s(pBuf + 1, 4, &dwAddress, 4);
+
+	VirtualProtect(lpOriginal, 5, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+	memcpy_s(lpOriginal, 5, pBuf, 5);
+	VirtualProtect(lpOriginal, 5, dwOldProtect, NULL);
+	return TRUE;
+}
+
+BOOL unHook(LPCSTR szDllName, LPCSTR szFuncName, PBYTE pOrgBytes) {
+	DWORD dwOldProtect;
+	PROC pFunc;
+
+	pFunc = GetProcAddress(GetModuleHandleA(szDllName), szFuncName);
+
+	VirtualProtect(pFunc, 5, PAGE_READWRITE, &dwOldProtect);
+	memcpy_s(pFunc, 5, pOrgBytes, 5);
+	VirtualProtect(pFunc, 5, dwOldProtect, NULL);
+	return TRUE;
 }
 
 void tryHook() 
 {
-	DWORD dwOldProtect;
-	void * lpOriginal = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtReadFile");
-
-	IAT_STRUCT *lpSavedFunc = (IAT_STRUCT *)VirtualAlloc(nullptr, sizeof(IAT_STRUCT), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	IAT_STRUCT newIATSTRUCT;
-
-	memcpy_s(lpSavedFunc, 5, lpOriginal, 5);
-
-	newFunc = &testFunction;
-	oldFunc = (tNtReadFile*)lpSavedFunc->lpTarget;
-
-	newIATSTRUCT.opcode = 0xE9;
-	newIATSTRUCT.lpTarget = reinterpret_cast<void *>((reinterpret_cast<int>(newFunc) - reinterpret_cast<int>(lpOriginal)) - 5);
-
-	VirtualProtect(lpOriginal, 5, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-	memcpy_s(lpOriginal , 5, &newIATSTRUCT, 5);
-	VirtualProtect(lpOriginal, 5, dwOldProtect, NULL);
+	hook("ntdll.dll", "NtReadFile", (PROC)NewNtReadFile, org_bytes);
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
