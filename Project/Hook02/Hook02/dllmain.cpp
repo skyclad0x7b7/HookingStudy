@@ -60,7 +60,7 @@ BOOL hook(LPCSTR szDllName, LPCSTR szFuncName, PROC pfnNew, PBYTE pOrgBytes) {
 	if (pByte[0] == 0xE9) // already hooked
 		return FALSE;
 
-	BYTE pBuf[5] = { 0xE9, 0, };
+	BYTE pBuf[5] = { 0xE9, 0, }; // Call
 
 	// backup old codes
 	memcpy_s(pOrgBytes, 5, lpOriginal, 5);
