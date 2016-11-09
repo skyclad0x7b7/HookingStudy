@@ -36,4 +36,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Debug\Hook02.dll" />
+  </ItemGroup>
 </Project>
