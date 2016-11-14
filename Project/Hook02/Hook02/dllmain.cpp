@@ -49,8 +49,8 @@ NTSTATUS __declspec(naked) NewNtReadFile(
 	__asm {
 		push ebp
 		mov  ebp, esp
+		sub  esp, 4
 	}
-	MessageBox(NULL, NULL, NULL, NULL);
 	NTSTATUS ret;
 	ret = prevFunction(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
 	__asm {

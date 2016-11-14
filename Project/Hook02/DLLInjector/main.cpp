@@ -8,7 +8,7 @@ BOOL injectDLL(DWORD dwPID, LPCTSTR szDLLName);
 int main(int argc, char *argv[])
 {
 	char *target = "notepad.exe";
-	char *dll = "Hook02.dll";
+	char *dll = "E:\\workspace\\Personal Project\\HookingStudy\\Project\\Hook02\\Debug\\Hook02.dll";
 
 	DWORD pid = findPID(target);
 	if (pid == 0xFFFFFFFF) {
