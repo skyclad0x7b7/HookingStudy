@@ -1,3 +1,5 @@
+// 32-bit WSASend Hooking (Code patching)
+
 #include <stdio.h>
 #include <WinSock2.h>
 #include <Windows.h>

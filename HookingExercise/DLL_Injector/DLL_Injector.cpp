@@ -9,6 +9,8 @@ DWORD findPID(LPCTSTR szProcessName);
 BOOL injectDLL(DWORD dwPID, LPCTSTR szDLLName);
 BOOL ejectDLL(DWORD dwPID, LPCTSTR szDLLName);
 
+HANDLE hTargetMod = NULL;
+
 int main(int argc, char *argv[])
 {
 	// Arguments check
@@ -23,6 +25,8 @@ int main(int argc, char *argv[])
 			printf("[-] Injection Failed\n");
 		else
 			printf("[+] Injection Successed\n");
+		system("pause");
+		ejection(argv[2], argv[3]);
 	}
 	else if (!strcmp(argv[1], "eject")) {
 		if (ejection(argv[2], argv[3]) == FALSE)
@@ -157,6 +161,7 @@ BOOL injectDLL(DWORD dwPID, LPCTSTR szDLLName)
 	}
 
 	WaitForSingleObject(hThread, INFINITE);
+	GetExitCodeThread(hThread, (LPDWORD)&hTargetMod);
 	CloseHandle(hThread);
 	CloseHandle(hProcess);
 	return TRUE;
@@ -172,33 +177,17 @@ BOOL ejectDLL(DWORD dwPID, LPCTSTR szDLLName)
 		return FALSE;
 	}
 
-	// Allocate memory to target process
-	LPVOID pRemoteBuf = NULL;
-	DWORD dwBufSize = lstrlen(szDLLName) + 1;
-	if ((pRemoteBuf = VirtualAllocEx(hProcess, NULL, dwBufSize, MEM_COMMIT, PAGE_READWRITE)) == INVALID_HANDLE_VALUE) {
-		printf("[-] VirtualAllocEx Error\n");
-		printf("[-] gle : 0x%x\n", GetLastError());
-		return FALSE;
-	}
-
-	// Write DLL name to target process memory
-	if (WriteProcessMemory(hProcess, pRemoteBuf, szDLLName, dwBufSize, NULL) == FALSE) {
-		printf("[-] WriteProcessMemory Error\n");
-		printf("[-] gle : 0x%x\n", GetLastError());
-		return FALSE;
-	}
-
 	// Get handle of "kernel32.dll"
 	HMODULE hMod = NULL;
 	if ((hMod = GetModuleHandle("kernel32.dll")) == INVALID_HANDLE_VALUE) {
-		printf("[-] GetModuleHandle Error\n");
+		printf("[-] Second GetModuleHandle Error\n");
 		printf("[-] gle : 0x%x\n", GetLastError());
 		return FALSE;
 	}
 
 	// Get address of "FreeLibrary"
 	LPTHREAD_START_ROUTINE pThreadProc = NULL;
-	if ((pThreadProc = (LPTHREAD_START_ROUTINE)GetProcAddress(hMod, "FreeLibrary")) == INVALID_HANDLE_VALUE) {
+	if ((pThreadProc = (LPTHREAD_START_ROUTINE)GetProcAddress(hMod, "FreeLibrary")) == NULL) {
 		printf("[-] GetProcAddress Error\n");
 		printf("[-] gle : 0x%x\n", GetLastError());
 		return FALSE;
@@ -206,7 +195,7 @@ BOOL ejectDLL(DWORD dwPID, LPCTSTR szDLLName)
 
 	// Create and run remote thread in target process
 	HANDLE hThread = NULL;
-	if ((hThread = CreateRemoteThread(hProcess, NULL, 0, pThreadProc, pRemoteBuf, 0, NULL)) == INVALID_HANDLE_VALUE) {
+	if ((hThread = CreateRemoteThread(hProcess, NULL, 0, pThreadProc, hTargetMod, 0, NULL)) == INVALID_HANDLE_VALUE) {
 		printf("[-] CreateRemoteThread Error\n");
 		printf("[-] gle : 0x%x\n", GetLastError());
 		return FALSE;

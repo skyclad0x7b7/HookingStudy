@@ -1,4 +1,4 @@
-// 32-bit notepad.exe - WriteFile Hooking
+// 32-bit notepad.exe - WriteFile Hooking (IAT)
 
 #include <stdio.h>
 #include <Windows.h>
@@ -18,8 +18,8 @@ typedef BOOL WINAPI tWriteFile(
 	_Inout_opt_ LPOVERLAPPED lpOverlapped
 );
 
-tWriteFile* prevFunction;
-tWriteFile* newFunction;
+tWriteFile* prevFunction = NULL;
+tWriteFile* newFunction = NULL;
 
 BOOL WINAPI NewWriteFile(
 	_In_        HANDLE       hFile,
@@ -67,6 +67,26 @@ DWORD WINAPI Hook()
 	return 0;
 }
 
+DWORD WINAPI UnHook()
+{
+	// Get address of target function
+	LPVOID lpOrgFunc = NULL;
+	if ((lpOrgFunc = GetProcAddress(GetModuleHandleA("kernel32.dll"), "WriteFile")) == NULL)
+		return -1;
+
+	// Backup old protect
+	DWORD dwOldProtect;
+	if (VirtualProtect(lpOrgFunc, 6, PAGE_EXECUTE_READWRITE, &dwOldProtect) == NULL)
+		return -1;
+
+	// Replacing
+	memcpy_s(lpOrgFunc, 6, prevFunction, 6);
+
+	// Rollback protection
+	VirtualProtect(lpOrgFunc, 6, dwOldProtect, NULL);
+	return 0;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
 	switch (ul_reason_for_call)
@@ -75,6 +95,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		Hook();
 		break;
 	case DLL_PROCESS_DETACH:
+		UnHook();
 		break;
 	}
 	return TRUE;
