@@ -50,7 +50,7 @@ int WINAPI NewWSASend(
 			MessageBox(NULL, errBuf, "ERROR", NULL);
 		}
 	}
-	for (int i = 0; i < dwBufferCount; i++) {
+	for (unsigned int i = 0; i < dwBufferCount; i++) {
 		sprintf_s(writeBuf, "[%d] : ", i);
 		if (WriteFile(hFile, writeBuf, strlen(writeBuf), NULL, NULL) != NULL) {
 			sprintf_s(errBuf, "[-] First WriteFile Failed with %d", GetLastError());
@@ -91,7 +91,7 @@ DWORD WINAPI Hook()
 
 	// Set OPCODE
 	newFuncObj.relJmp = 0xE9;
-	newFuncObj.shortJmp = 0xF9EB;
+	newFuncObj.shortJmp = (short)0xF9EB;
 
 	// Set new functon to replace
 	newFuncObj.lpTarget = (LPVOID)((DWORD)&NewWSASend - ((DWORD)lpOrgFunc - 5) - 5);

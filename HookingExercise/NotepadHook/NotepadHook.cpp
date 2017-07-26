@@ -1,3 +1,5 @@
+// 32-bit notepad.exe - WriteFile Hooking
+
 #include <stdio.h>
 #include <Windows.h>
 
@@ -32,7 +34,7 @@ BOOL WINAPI NewWriteFile(
 	return prevFunction(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
 }
 
-DWORD WINAPI tryHook()
+DWORD WINAPI Hook()
 {
 	// Get address of target function
 	LPVOID lpOrgFunc = NULL;
@@ -70,7 +72,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
-		tryHook();
+		Hook();
 		break;
 	case DLL_PROCESS_DETACH:
 		break;
