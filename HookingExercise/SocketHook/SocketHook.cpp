@@ -7,12 +7,21 @@
 
 #define LOG_FILE "E:\\test\\test.log"
 
-#pragma pack(1)
+#pragma pack(push, 1)
+struct IAT_STRUCT
+{
+	SHORT Opcode;
+	LPVOID lpTarget;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
 struct NEW_FUNC {
 	BYTE relJmp;
 	LPVOID lpTarget;
 	SHORT shortJmp;
 };
+#pragma pack(pop)
 
 typedef int WINAPI tWSASend(
 	_In_  SOCKET                             s,
@@ -79,31 +88,62 @@ DWORD WINAPI Hook()
 	if ((lpOrgFunc = GetProcAddress(hModule, "WSASend")) == NULL)
 		return -1;
 
-	// Backup set new protect and old protect
-	DWORD dwOldProtect = NULL;
-	if (VirtualProtect((LPVOID)((DWORD)lpOrgFunc - 5), 7, PAGE_EXECUTE_READWRITE, &dwOldProtect) == NULL)
-		return -1;
+	DWORD hookLength = 0;
+	if ((*(SHORT *)lpOrgFunc) == 0x25FF)
+		hookLength = 6;
+	else
+		hookLength = 7;
 
+	if (hookLength == 6) // IAT Hooking
+	{
+		// Backup old function IAT
+		DWORD dwOldProtect = NULL;
+		IAT_STRUCT*  lpSavedFunc = (IAT_STRUCT*)VirtualAlloc(NULL, sizeof(IAT_STRUCT), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+		IAT_STRUCT   newFuncObj;
+		memcpy_s(lpSavedFunc, 6, lpOrgFunc, 6);
+		prevFunction = (tWSASend*)lpSavedFunc;
 
-	// Backup old function
-	NEW_FUNC *lpSavedFunc = (NEW_FUNC *)VirtualAlloc(NULL, sizeof(NEW_FUNC), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	NEW_FUNC newFuncObj;
-	memcpy_s(lpSavedFunc, 7, (LPVOID)((DWORD)lpOrgFunc - 5), 7);
-	prevFunction = (tWSASend *)((DWORD)lpOrgFunc + 2);
+		// Absolute Jump
+		newFuncObj.Opcode = 0x25FF;
 
-	// Set OPCODE
-	newFuncObj.relJmp = 0xE9;
-	newFuncObj.shortJmp = (short)0xF9EB;
+		// Set new functon to replace
+		newFunction = &NewWSASend;
+		newFuncObj.lpTarget = &newFunction;
 
-	// Set new functon to replace
-	newFuncObj.lpTarget = (LPVOID)((DWORD)&NewWSASend - ((DWORD)lpOrgFunc - 5) - 5);
+		// Replacing
+		memcpy_s(lpOrgFunc, 6, &newFuncObj, 6);
 
-	// Replacing
-	memcpy_s((LPVOID)((DWORD)lpOrgFunc - 5), 7, &newFuncObj, 7);
+		// Rollback protection
+		if (VirtualProtect(lpOrgFunc, 7, dwOldProtect, NULL) == NULL)
+			return -1;
+	}
+	else // Code patching
+	{
+		// Backup set new protect and old protect
+		DWORD dwOldProtect = NULL;
+		if (VirtualProtect((LPVOID)((DWORD)lpOrgFunc - 5), 7, PAGE_EXECUTE_READWRITE, &dwOldProtect) == NULL)
+			return -1;
 
-	// Rollback protection
-	if (VirtualProtect((LPVOID)((DWORD)lpOrgFunc - 5), 7, dwOldProtect, NULL) == NULL)
-		return -1;
+		// Backup old function
+		NEW_FUNC *lpSavedFunc = (NEW_FUNC *)VirtualAlloc(NULL, sizeof(NEW_FUNC), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+		NEW_FUNC newFuncObj;
+		memcpy_s(lpSavedFunc, 7, (LPVOID)((DWORD)lpOrgFunc - 5), 7);
+		prevFunction = (tWSASend *)((DWORD)lpOrgFunc + 2);
+
+		// Set OPCODE
+		newFuncObj.relJmp = 0xE9;
+		newFuncObj.shortJmp = (short)0xF9EB;
+
+		// Set new functon to replace
+		newFuncObj.lpTarget = (LPVOID)((DWORD)&NewWSASend - ((DWORD)lpOrgFunc - 5) - 5);
+
+		// Replacing
+		memcpy_s((LPVOID)((DWORD)lpOrgFunc - 5), 7, &newFuncObj, 7);
+
+		// Rollback protection
+		if (VirtualProtect((LPVOID)((DWORD)lpOrgFunc - 5), 7, dwOldProtect, NULL) == NULL)
+			return -1;
+	}
 	return 0;
 }
 

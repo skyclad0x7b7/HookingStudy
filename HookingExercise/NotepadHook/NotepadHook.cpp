@@ -3,12 +3,13 @@
 #include <stdio.h>
 #include <Windows.h>
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct IAT_STRUCT
 {
 	SHORT Opcode;
 	LPVOID lpTarget;
 };
+#pragma pack(pop)
 
 typedef BOOL WINAPI tWriteFile(
 	_In_        HANDLE       hFile,
