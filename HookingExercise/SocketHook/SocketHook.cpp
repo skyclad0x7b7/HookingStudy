@@ -1,6 +1,8 @@
 // 32-bit WSASend Hooking (Code patching)
 
 #include <stdio.h>
+#include <iostream>
+#include <fstream>
 #include <WinSock2.h>
 #include <Windows.h>
 #include <Shlwapi.h>
@@ -47,32 +49,13 @@ int WINAPI NewWSASend(
 )
 {
 	char errBuf[128] = { 0, };
-	char writeBuf[32] = { 0, };
-	HANDLE hFile = NULL;
-	if (PathFileExists(LOG_FILE)) {
-		if ((hFile = CreateFile(LOG_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL)) == INVALID_HANDLE_VALUE) {
-			sprintf_s(errBuf, "[-] CreateFile (Make) Failed with %d", GetLastError());
-			MessageBox(NULL, errBuf, "ERROR", NULL);
-		}
-	}
-	else {
-		if ((hFile = CreateFile(LOG_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, NULL, NULL)) == INVALID_HANDLE_VALUE) {
-			sprintf_s(errBuf, "[-] First CreateFile (Open) Failed with %d", GetLastError());
-			MessageBox(NULL, errBuf, "ERROR", NULL);
-		}
-	}
+	std::ofstream myLogFile;
+	while (!myLogFile.is_open()) 
+		myLogFile.open("E:\\test\\test.log", std::ios::out | std::ios::app | std::ios::binary);
 	for (unsigned int i = 0; i < dwBufferCount; i++) {
-		sprintf_s(writeBuf, "[%d] : ", i);
-		if (WriteFile(hFile, writeBuf, strlen(writeBuf), NULL, NULL) != NULL) {
-			sprintf_s(errBuf, "[-] First WriteFile Failed with %d", GetLastError());
-			MessageBox(NULL, errBuf, "ERROR", NULL);
-		}
-		if (WriteFile(hFile, lpBuffers[i].buf, lpBuffers[i].len, NULL, NULL) != NULL) {
-			sprintf_s(errBuf, "[-] Second WriteFile Failed with %d", GetLastError());
-			MessageBox(NULL, errBuf, "ERROR", NULL);
-		}
+		myLogFile.write(lpBuffers[i].buf, lpBuffers[i].len);
 	}
-	CloseHandle(hFile);
+	myLogFile.close();
 	return prevFunction(s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpOverlapped, lpCompletionRoutine);
 }
 
